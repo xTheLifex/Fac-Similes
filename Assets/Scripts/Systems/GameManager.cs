@@ -52,6 +52,10 @@ namespace FacSimiles.Systems
         }
 		
 		public Script Lua;
+		
+		#if UNITY_EDITOR
+		public bool skipPacking = false;
+		#endif
 
 		
 		/* -------------------------------------------------------------------------- */
@@ -196,20 +200,35 @@ namespace FacSimiles.Systems
 			#if UNITY_EDITOR
 			// We are running in Unity Editor.
 			/* -------------------------------------------------------------------------- */
-			
-			SetLoadingText("Editor: Clearing game cache...");
-			yield return StartCoroutine(IClearCache());
-			
-			// Compile our main game package.
-			SetLoadingText("Editor: Compiling game banks...");
-			yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/Game", "game"));
-			
+			if (!skipPacking)
+			{
+				SetLoadingText("Editor: Clearing game cache...");
+				yield return StartCoroutine(IClearCache());
+				
+				// Compile our main game package.
+				SetLoadingText("Editor: Compiling game banks...");
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/Game", "game"));
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/DLC0", "dlc0"));
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/DLC1", "dlc1"));
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/DLC2", "dlc2"));
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/DLC3", "dlc3"));
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/DLC4", "dlc4"));
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/DLC5", "dlc5"));
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/DLC6", "dlc6"));
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/DLC7", "dlc7"));
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/DLC8", "dlc8"));
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/DLC9", "dlc9"));
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/DLC10", "dlc10"));
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/DLC11", "dlc11"));
+				yield return StartCoroutine(IPackBank(Application.streamingAssetsPath + "/BankSource/DLC12", "dlc12"));
+			}
 			/* -------------------------------------------------------------------------- */
 			#endif
 
 			// Support for future FREE DLCs.
 			SetLoadingText("Preparing game banks...");
 			yield return StartCoroutine(IUnpackBank("game"));
+			yield return StartCoroutine(IUnpackBank("dlc0"));
 			yield return StartCoroutine(IUnpackBank("dlc1"));
 			yield return StartCoroutine(IUnpackBank("dlc2"));
 			yield return StartCoroutine(IUnpackBank("dlc3"));
@@ -268,6 +287,12 @@ namespace FacSimiles.Systems
 		/* -------------------------------------------------------------------------- */
 		private IEnumerator IPackBank(string path, string output)
 		{
+			if (!Directory.Exists(path))
+			{
+				Logger.Log(Channel.Loading, "Skipping Packing of " + path + ": Not found");
+				yield break;
+			}
+			
 			// Compiled Files Dictionary
 			Dictionary<string[], string> cfd = new Dictionary<string[], string>();
 			
@@ -431,6 +456,22 @@ namespace FacSimiles.Systems
 			UserData.RegisterAssembly();
 			Lua.Globals["game"] = new GameAPI();
 			
+			// We should check our bank files for lua files and load them
+			string[] files = Utils.GetFilesRecursive(DataManager.GetBanksFolder());
+			foreach(string file in files)
+			{
+				// We only need "bank.lua" files. Any additional files are called by the bank.lua file itself.
+				string fname = Path.GetFileName(file);
+				if (fname == "bank.lua")
+				{
+					//TODO: Fix why global is not being called. Probably not loading file? Try executing it.
+					Lua.LoadFile(fname);
+					yield return null;
+				}
+			}
+
+			// Call our init method.
+			Lua.Call(Lua.Globals["Init"]);
 
 			/*
 			if (scriptFile)
